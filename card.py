@@ -1,10 +1,84 @@
 from collections import Counter
 import itertools
 
+
+def get_action_space():
+    actions = []
+    # max_cards = 20
+    # single
+    for card in Card.cards:
+        actions.append([card])
+    # pair
+    for card in Card.cards:
+        if card != '*' and card != '$':
+            actions.append([card] * 2)
+    # triple
+    for card in Card.cards:
+        if card != '*' and card != '$':
+            actions.append([card] * 3)
+    # 3 + 1
+    for main in Card.cards:
+        if main != '*' and main != '$':
+            for extra in Card.cards:
+                if extra != main:
+                    actions.append([main] * 3 + [extra])
+    # 3 + 2
+    for main in Card.cards:
+        if main != '*' and main != '$':
+            for extra in Card.cards:
+                if extra != main and extra != '*' and extra != '$':
+                    actions.append([main] * 3 + [extra] * 2)
+    # single sequence
+    for start_v in range(Card.to_value('3'), Card.to_value('2')):
+        for end_v in range(start_v + 5, Card.to_value('2')):
+            seq = range(start_v, end_v)
+            actions.append(Card.to_cards(seq))
+    # double sequence
+    for start_v in range(Card.to_value('3'), Card.to_value('2')):
+        for end_v in range(start_v + 3, min(start_v + 20 / 2, Card.to_value('2'))):
+            seq = range(start_v, end_v)
+            actions.append(Card.to_cards(seq) * 2)
+    # triple sequence
+    for start_v in range(Card.to_value('3'), Card.to_value('2')):
+        for end_v in range(start_v + 2, min(start_v + 20 / 3, Card.to_value('2'))):
+            seq = range(start_v, end_v)
+            actions.append(Card.to_cards(seq) * 3)
+    # 3 + 1 sequence
+    for start_v in range(Card.to_value('3'), Card.to_value('2')):
+        for end_v in range(start_v + 2, min(start_v + 20 / 4, Card.to_value('2'))):
+            seq = range(start_v, end_v)
+            main = Card.to_cards(seq)
+            remains = [card for card in Card.cards if card not in main]
+            for extra in list(itertools.combinations(remains, end_v - start_v)):
+                actions.append([main] * 3 + list(extra))
+    # 3 + 2 sequence
+    for start_v in range(Card.to_value('3'), Card.to_value('2')):
+        for end_v in range(start_v + 2, min(start_v + 20 / 5, Card.to_value('2'))):
+            seq = range(start_v, end_v)
+            main = Card.to_cards(seq)
+            remains = [card for card in Card.cards if card not in main and card not in ['*', '$']]
+            for extra in list(itertools.combinations(remains, end_v - start_v)):
+                actions.append([main] * 3 + list(extra) * 2)
+    # bomb
+    for card in Card.cards:
+        if card != '*' and card != '$':
+            actions.append([card] * 4)
+    # bigbang
+    actions.append(['*', '$'])
+    # 4 + 2
+    for main in Card.cards:
+        if main != '*' and main != '$':
+            remains = [card for card in Card.cards if card != main]
+            for extra in list(itertools.combinations(remains, 2)):
+                actions.append([main] * 4 + list(extra))
+
+    return actions
+
+
 class Card:
     cards = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2', '*', '$']
     cards_to_value = dict(zip(cards, range(len(cards))))
-    value_to_cards = {(v, c) for (c, v) in cards_to_value.iteritems()}
+    value_to_cards = dict((v, c) for (c, v) in cards_to_value.iteritems())
 
     def __init__(self):
         pass
@@ -18,6 +92,16 @@ class Card:
             return val
         else:
             return Card.cards_to_value[card]
+
+    @staticmethod
+    def to_cards(values):
+        if type(values) is list:
+            cards = []
+            for v in values:
+                cards.append(Card.value_to_cards[v])
+            return cards
+        else:
+            return Card.value_to_cards[values]
 
 
 class CardGroup:
@@ -208,4 +292,7 @@ class CardGroup:
         return candidates
 
 if __name__ == '__main__':
-    CardGroup.analyze(['3', '3', '3', '4', '4', '4', '10', 'J', 'Q', 'A', 'A', '2', '2', '*', '$'])
+    actions = get_action_space()
+    print len(actions)
+    # print Card.to_cards(1)
+    # CardGroup.analyze(['3', '3', '3', '4', '4', '4', '10', 'J', 'Q', 'A', 'A', '2', '2', '*', '$'])
