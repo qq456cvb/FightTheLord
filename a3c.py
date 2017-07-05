@@ -43,7 +43,7 @@ class CardNetwork:
             self.advantages = tf.placeholder(tf.float32, [None], "advantage_input")
 
             self.pi_sample = tf.reduce_sum(self.action_one_hot * self.policy_pred, [1])
-            self.policy_loss = -tf.reduce_sum(tf.log(self.pi_sample) * self.advantages)
+            self.policy_loss = -tf.reduce_sum(tf.log(tf.clip_by_value(self.pi_sample, 1e-20, 1.)) * self.advantages)
 
             self.val_loss = tf.reduce_sum(tf.square(self.val_pred-self.val_truth))
 
