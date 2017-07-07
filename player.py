@@ -1,4 +1,15 @@
+from __future__ import print_function
 from card import CardGroup, Card
+from collections import Counter
+
+
+def counter_subset(list1, list2):
+    c1, c2 = Counter(list1), Counter(list2)
+
+    for (k, n) in c1.items():
+        if n > c2[k]:
+            return False
+    return True
 
 
 class Player:
@@ -9,6 +20,7 @@ class Player:
         self.name = name
         self.is_lord = False
         self.trainable = False
+        self.is_human = False
 
     def draw(self, group):
         self.need_analyze = True
@@ -26,6 +38,26 @@ class Player:
             self.cards.remove(group)
 
     def respond(self, last_player, cards, before_player, next_player):
+        if self.is_human:
+            print("your cards: ", end='')
+            print(self.cards)
+            intend = raw_input("enter your intention(0 for pass): ")
+            intend = intend.strip()
+            intend = intend.split(',')
+            if intend[0] == '0':
+                return last_player, cards, True
+            else:
+                if not counter_subset(intend, self.cards) or \
+                        not CardGroup.isvalid(intend):
+                    print("invalid intention, try again")
+                    return self.respond(last_player, cards, before_player, next_player)
+                else:
+                    if last_player is not None and last_player != self:
+                        if not (CardGroup.to_cardgroup(intend)).bigger_than(cards):
+                            print('you must give bigger cards')
+                            return self.respond(last_player, cards, before_player, next_player)
+            self.discard(intend)
+            return self, CardGroup.to_cardgroup(intend), False
         if self.need_analyze:
             self.candidates = CardGroup.analyze(self.cards)
 

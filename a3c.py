@@ -169,13 +169,53 @@ class CardMaster:
                     self.summary_writer.flush()
 
 
+def run_game(sess, network):
+    max_episode_length = 100
+    for i in xrange(20):
+        network.env.reset()
+        network.env.players[0].trainable = True
+        network.env.players[2].is_human = True
+        network.env.prepare(2)
+
+        s = network.env.get_state(0)
+        s = np.reshape(s, [1, -1])
+
+        while True:
+            policy, val = sess.run([network.agent.network.policy_pred, network.agent.network.val_pred],
+                                   feed_dict={network.agent.network.input: s})
+            mask = network.env.get_mask(0)
+            valid_actions = np.take(np.arange(network.a_dim), mask.nonzero())
+            valid_actions = valid_actions.reshape(-1)
+            valid_p = np.take(policy[0], mask.nonzero())
+            valid_p = valid_p / np.sum(valid_p)
+            valid_p = valid_p.reshape(-1)
+            a = np.random.choice(valid_actions, p=valid_p)
+
+            r, done = network.env.step(0, a)
+            s_prime = network.env.get_state(0)
+            s_prime = np.reshape(s_prime, [1, -1])
+
+            if done:
+                idx = network.env.check_winner()
+                print "winner is player %d" % idx
+                print ".............................."
+                break
+            s = s_prime
+
 if __name__ == '__main__':
     os.system("rm -r ./train_global/")
+    load_model = True
+    model_path = './model'
     cardgame = game.Game()
     with tf.device("/gpu:0"):
         master = CardMaster(cardgame)
     saver = tf.train.Saver(max_to_keep=5)
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        master.run(sess, saver, 2000)
-    sess.close()
+        if load_model:
+            print ('Loading Model...')
+            ckpt = tf.train.get_checkpoint_state(model_path)
+            saver.restore(sess, ckpt.model_checkpoint_path)
+        else:
+            sess.run(tf.global_variables_initializer())
+            master.run(sess, saver, 2000)
+        sess.close()

@@ -25,6 +25,7 @@ class Game:
         self.history = []
         self.extra_cards = []
         self.action_space = card.get_action_space()
+        self.next_turn = 0
         self.reset()
 
     def reset(self):
@@ -57,12 +58,13 @@ class Game:
         return mask
 
     def prepare(self, lord_idx):
-
         # three cards for the lord
         for i in xrange(3):
             self.extra_cards.append(self.deck[i])
         del self.deck[:3]
 
+        print("extra cards: ", end='')
+        print(self.extra_cards)
         # draw cards in turn
         for i in xrange(len(self.deck)):
             self.players[i % 3].draw(self.deck[i])
@@ -75,9 +77,11 @@ class Game:
         for p in self.players:
             p.cards = sorted(p.cards, key=lambda k: Card.cards_to_value[k])
 
+        self.next_turn = (lord_idx + 3) % 3
         for i in range(lord_idx, lord_idx + 3):
             idx = i % 3
             if self.players[idx].trainable:
+                self.next_turn = idx
                 break
             else:
                 self.last_player, self.last_cards, passed = self.players[idx].respond(self.last_player, self.last_cards,
@@ -86,25 +90,32 @@ class Game:
                 self.log(idx, self.last_cards.cards, passed)
 
     def run(self):
-        last = None
-
-        cards = []
         over = False
         winner = None
         while not over:
             # raw_input("Press Enter to continue...")
             over = False
             for i in xrange(3):
-                last, cards = self.players[i].respond(last, cards,
-                                                      self.players[(i - 1) % 3],
-                                                      self.players[(i + 1) % 3])
+                i = (self.next_turn + i) % 3
+                self.last_player, self.last_cards, passed = self.players[i].respond(self.last_player, self.last_cards,
+                                                                                    self.players[(i - 1) % 3],
+                                                                                    self.players[(i + 1) % 3])
+                self.log(i, self.last_cards.cards, passed)
+                self.history += self.last_cards.cards
                 if not self.players[i].cards:
                     # winner = self.players[i].name
                     winner = i
                     over = True
                     break
         print("winner is player %s" % winner)
+        print('....................................')
         return winner
+
+    def check_winner(self):
+        for i in range(3):
+            if not self.players[i].cards:
+                return i
+        return None
 
     def log(self, i, cards, passed):
         if passed:
@@ -113,7 +124,7 @@ class Game:
             print("player %d respond:" % i, end='')
             print(cards)
 
-    def step(self, i, a):
+    def step(self, i, a, single_step=False):
         if a != 0:
             self.players[i].discard(self.action_space[a])
             self.last_player = self.players[i]
@@ -125,19 +136,20 @@ class Game:
                 return 2 if self.players[i].is_lord else 1, True
         else:
             self.log(i, [], True)
-        for k in xrange(i + 1, i + 3):
-            ai = k % 3
-            if self.players[ai].trainable:
-                break
-            if not self.players[ai].cards:
-                # TODO: add coordination rewards
-                return -1, True
-            self.last_player, self.last_cards, passed = self.players[ai].respond(self.last_player, self.last_cards,
-                                                                         self.players[(ai - 1) % 3],
-                                                                         self.players[(ai + 1) % 3])
-            self.log(ai, self.last_cards.cards, passed)
-            if not passed:
-                self.history += self.last_cards.cards
+        if not single_step:
+            for k in xrange(i + 1, i + 3):
+                ai = k % 3
+                if self.players[ai].trainable:
+                    break
+                if not self.players[ai].cards:
+                    # TODO: add coordination rewards
+                    return -1, True
+                self.last_player, self.last_cards, passed = self.players[ai].respond(self.last_player, self.last_cards,
+                                                                             self.players[(ai - 1) % 3],
+                                                                             self.players[(ai + 1) % 3])
+                self.log(ai, self.last_cards.cards, passed)
+                if not passed:
+                    self.history += self.last_cards.cards
         return 0, False
 
     def get_state(self, i):
@@ -151,7 +163,8 @@ if __name__ == '__main__':
     total = 100
     for i in range(total):
         game.reset()
-        game.prepare(0)
+        game.players[2].is_human = True
+        game.prepare(2)
         winner = game.run()
         if winner == 0:
             cnt += 1
