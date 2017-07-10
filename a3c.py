@@ -43,7 +43,7 @@ class CardNetwork:
             self.advantages = tf.placeholder(tf.float32, [None], "advantage_input")
 
             self.pi_sample = tf.reduce_sum(self.action_one_hot * self.policy_pred, [1])
-            self.policy_loss = -tf.reduce_sum(tf.log(tf.clip_by_value(self.pi_sample, 1e-20, 1.)) * self.advantages)
+            self.policy_loss = -tf.reduce_sum(tf.log(tf.clip_by_value(self.pi_sample, 1e-10, 1.)) * self.advantages)
 
             self.val_loss = tf.reduce_sum(tf.square(self.val_pred-self.val_truth))
 
@@ -171,11 +171,13 @@ class CardMaster:
 
 def run_game(sess, network):
     max_episode_length = 100
-    for i in xrange(20):
+    lord_win_rate = 0
+    for i in xrange(100):
         network.env.reset()
         network.env.players[0].trainable = True
+        lord_idx = 2
         network.env.players[2].is_human = True
-        network.env.prepare(2)
+        network.env.prepare(lord_idx)
 
         s = network.env.get_state(0)
         s = np.reshape(s, [1, -1])
@@ -187,7 +189,10 @@ def run_game(sess, network):
             valid_actions = np.take(np.arange(network.a_dim), mask.nonzero())
             valid_actions = valid_actions.reshape(-1)
             valid_p = np.take(policy[0], mask.nonzero())
-            valid_p = valid_p / np.sum(valid_p)
+            if np.count_nonzero(valid_p) == 0:
+                valid_p = np.ones([valid_p.size]) / float(valid_p.size)
+            else:
+                valid_p = valid_p / np.sum(valid_p)
             valid_p = valid_p.reshape(-1)
             a = np.random.choice(valid_actions, p=valid_p)
 
@@ -197,10 +202,13 @@ def run_game(sess, network):
 
             if done:
                 idx = network.env.check_winner()
+                if idx == lord_idx:
+                    lord_win_rate += 1
                 print "winner is player %d" % idx
                 print ".............................."
                 break
             s = s_prime
+    print "lord winning rate: %f" % (lord_win_rate / 100.0)
 
 if __name__ == '__main__':
     os.system("rm -r ./train_global/")
@@ -215,6 +223,7 @@ if __name__ == '__main__':
             print ('Loading Model...')
             ckpt = tf.train.get_checkpoint_state(model_path)
             saver.restore(sess, ckpt.model_checkpoint_path)
+            run_game(sess, master)
         else:
             sess.run(tf.global_variables_initializer())
             master.run(sess, saver, 2000)
