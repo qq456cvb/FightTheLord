@@ -3,6 +3,25 @@ import numpy as np
 import itertools
 
 
+def cmp_to_key(mycmp):
+    'Convert a cmp= function into a key= function'
+    class K:
+        def __init__(self, obj, *args):
+            self.obj = obj
+        def __lt__(self, other):
+            return mycmp(self.obj, other.obj) < 0
+        def __gt__(self, other):
+            return mycmp(self.obj, other.obj) > 0
+        def __eq__(self, other):
+            return mycmp(self.obj, other.obj) == 0
+        def __le__(self, other):
+            return mycmp(self.obj, other.obj) <= 0
+        def __ge__(self, other):
+            return mycmp(self.obj, other.obj) >= 0
+        def __ne__(self, other):
+            return mycmp(self.obj, other.obj) != 0
+    return K
+
 def get_action_space():
     actions = [[]]
     # max_cards = 20
@@ -32,22 +51,22 @@ def get_action_space():
     # single sequence
     for start_v in range(Card.to_value('3'), Card.to_value('2')):
         for end_v in range(start_v + 5, Card.to_value('2')):
-            seq = range(start_v, end_v)
+            seq = list(range(start_v, end_v))
             actions.append(Card.to_cards(seq))
     # double sequence
     for start_v in range(Card.to_value('3'), Card.to_value('2')):
-        for end_v in range(start_v + 3, min(start_v + 20 / 2, Card.to_value('2'))):
-            seq = range(start_v, end_v)
+        for end_v in range(start_v + 3, min(start_v + 20 // 2, Card.to_value('2'))):
+            seq = list(range(start_v, end_v))
             actions.append(Card.to_cards(seq) * 2)
     # triple sequence
     for start_v in range(Card.to_value('3'), Card.to_value('2')):
-        for end_v in range(start_v + 2, min(start_v + 20 / 3, Card.to_value('2'))):
-            seq = range(start_v, end_v)
+        for end_v in range(start_v + 2, min(start_v + 20 // 3, Card.to_value('2'))):
+            seq = list(range(start_v, end_v))
             actions.append(Card.to_cards(seq) * 3)
     # 3 + 1 sequence
     for start_v in range(Card.to_value('3'), Card.to_value('2')):
-        for end_v in range(start_v + 2, min(start_v + 20 / 4, Card.to_value('2'))):
-            seq = range(start_v, end_v)
+        for end_v in range(start_v + 2, min(start_v + 20 // 4, Card.to_value('2'))):
+            seq = list(range(start_v, end_v))
             main = Card.to_cards(seq)
             remains = [card for card in Card.cards if card not in main]
             for extra in list(itertools.combinations(remains, end_v - start_v)):
@@ -55,8 +74,8 @@ def get_action_space():
                     actions.append(main * 3 + list(extra))
     # 3 + 2 sequence
     for start_v in range(Card.to_value('3'), Card.to_value('2')):
-        for end_v in range(start_v + 2, min(start_v + 20 / 5, Card.to_value('2'))):
-            seq = range(start_v, end_v)
+        for end_v in range(start_v + 2, min(start_v + 20 // 5, Card.to_value('2'))):
+            seq = list(range(start_v, end_v))
             main = Card.to_cards(seq)
             remains = [card for card in Card.cards if card not in main and card not in ['*', '$']]
             for extra in list(itertools.combinations(remains, end_v - start_v)):
@@ -87,7 +106,7 @@ class Card:
     cards_to_onehot_idx['*'] = 52
     cards_to_onehot_idx['$'] = 53
     cards_to_value = dict(zip(cards, range(len(cards))))
-    value_to_cards = dict((v, c) for (c, v) in cards_to_value.iteritems())
+    value_to_cards = dict((v, c) for (c, v) in cards_to_value.items())
 
     def __init__(self):
         pass
@@ -159,6 +178,7 @@ class CardGroup:
         for c in candidates:
             if len(c.cards) == len(cards):
                 return c
+        print(cards)
         raise Exception("Invalid Cards!")
 
     @staticmethod
@@ -325,7 +345,7 @@ class CardGroup:
         # 3 * n + n, 3 * n + 2 * n
         triple_seq = [c.cards for c in candidates if c.type == 'triple_seq']
         for cand in triple_seq:
-            cnt = len(cand) / 3
+            cnt = len(cand) // 3
             for extra in list(itertools.combinations(singles, cnt)):
                 candidates.append(
                     CardGroup(cand + list(extra), 'triple_seq+singles',
@@ -339,8 +359,8 @@ class CardGroup:
                       'triple+double', 'triple_seq+singles', 'triple_seq+doubles',
                       'triple_seq', 'triple', 'quadric+singles', 'quadric+doubles',
                       'bomb', 'bigbang']
-        candidates.sort(cmp=lambda x, y: importance.index(x.type) - importance.index(y.type)
-                        if importance.index(x.type) != importance.index(y.type) else x.value - y.value)
+        candidates.sort(key=cmp_to_key(lambda x, y: importance.index(x.type) - importance.index(y.type)
+                        if importance.index(x.type) != importance.index(y.type) else x.value - y.value))
         # for c in candidates:
         #     print c.cards
         return candidates
@@ -353,8 +373,8 @@ if __name__ == '__main__':
     # print actions[561]
     # print CardGroup.folks(actions[561])
     for i in range(1, len(actions)):
-        print i
-        print CardGroup.folks(actions[i])
+        print(i)
+        print(CardGroup.folks(actions[i]))
         assert CardGroup.folks(actions[i]) == 1
         # CardGroup.to_cardgroup(actions[i])
     # actions = get_action_space()
